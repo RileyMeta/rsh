@@ -1,69 +1,35 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 #include <sys/wait.h>
 #include <fcntl.h>
-#include <limits.h>
+#include <limits.h> // Needed for MAX_INPUT
+#include <stdbool.h>
+
+#include "sysinfo.h"
 
 #define MAX_ARGS 64
-#define BUFFER 256
 
 const char VERSION[] = "0.1";
 
-void printPS1(void);
+void printPS1(bool interrupt);
 
 void handle_sigint(int sig) {
-    printPS1();
+    printPS1(true);
 }
 
-char *return_pwd() {
-    static char result[1024];  // static keeps it alive after function returns
-    char cwd[1024];
-    const char *home = getenv("HOME");
-
-    if (getcwd(cwd, sizeof(cwd)) != NULL) {
-        if (strncmp(cwd, home, strlen(home)) == 0) {
-            // Inside home, replace with ~
-            snprintf(result, sizeof(result), "~%s", cwd + strlen(home));
-        } else {
-            // Outside home, return full path
-            snprintf(result, sizeof(result), "%s", cwd);
-        }
-        return result;
-    } else {
-        perror("getcwd() error");
-        return NULL;
-    }
-}
-
-char *return_uname() {
-    char *uname = getenv("USER");
-
-    if (uname != NULL) {
-        return uname;
-    } else {
-        perror("getusername");
-        return NULL;
-    }
-}
-
-char *return_hname() {
-    char *hostname = malloc(BUFFER);
-
-    if (gethostname(hostname, BUFFER) != 0) {
-        perror("gethostname");
-        return NULL;
-    }
-    return hostname;
-}
-
-void printPS1() {
+void printPS1(bool interrupt) {
+    // change this to an if, that checks
+    // a configuration file and cycles through
+    // normal = final instance/current DIR
+    // extended = ~/dir
+    // exact = full path, from root
     char *username = return_uname();
     char *hostname = return_hname();
     char *pwd = return_pwd();
 
-    printf("\n[%s@%s %s]$ ", username, hostname, pwd);
+    if (!interrupt)
+        printf("[%s@%s %s]$ ", username, hostname, pwd);
+    else
+        printf("\n[%s@%s %s]$ ", username, hostname, pwd);
+
     fflush(stdout);
 }
 
@@ -98,15 +64,8 @@ void shell_loop() {
 
     signal(SIGINT, handle_sigint);
 
-    do { // change this to an if, that checks
-         // a configuration file and cycles through
-         // normal = final instance/current DIR
-         // extended = ~/dir
-         // exact = full path, from root
-
-        printPS1();
-//        printf("[%s@%s %s]$ ", username, hostname, pwd);
-//        fflush(stdout);
+    do {
+        printPS1(false);
 
         if (!fgets(input, MAX_INPUT, stdin)) break;
         input[strcspn(input, "\n")] = 0;
