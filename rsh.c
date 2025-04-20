@@ -11,6 +11,12 @@
 
 const char VERSION[] = "0.1";
 
+void printPS1(void);
+
+void handle_sigint(int sig) {
+    printPS1();
+}
+
 char *return_pwd() {
     static char result[1024];  // static keeps it alive after function returns
     char cwd[1024];
@@ -52,6 +58,15 @@ char *return_hname() {
     return hostname;
 }
 
+void printPS1() {
+    char *username = return_uname();
+    char *hostname = return_hname();
+    char *pwd = return_pwd();
+
+    printf("\n[%s@%s %s]$ ", username, hostname, pwd);
+    fflush(stdout);
+}
+
 void parse_input(char *input, char **args, char **out_file) {
     *out_file = NULL;
     int arg_count = 0;
@@ -81,13 +96,17 @@ void shell_loop() {
     char *hostname = return_hname();
     char *pwd = return_pwd();
 
+    signal(SIGINT, handle_sigint);
+
     do { // change this to an if, that checks
          // a configuration file and cycles through
          // normal = final instance/current DIR
          // extended = ~/dir
          // exact = full path, from root
-        printf("[%s@%s %s]$ ", username, hostname, pwd);
-        fflush(stdout);
+
+        printPS1();
+//        printf("[%s@%s %s]$ ", username, hostname, pwd);
+//        fflush(stdout);
 
         if (!fgets(input, MAX_INPUT, stdin)) break;
         input[strcspn(input, "\n")] = 0;
@@ -99,6 +118,9 @@ void shell_loop() {
 
         pid_t pid = fork();
         if (pid == 0) {
+            // Reset SIGINT to default behavior after use on Child Process
+            signal(SIGINT, SIG_DFL);
+
             // Handle output redirection
             if (out_file) {
                 int fd = open(out_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
